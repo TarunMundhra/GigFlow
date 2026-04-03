@@ -18,10 +18,15 @@ app.use(cookieParser())
 
 // routers
 import userRouter from "./routes/user.route.js"
+import bidRouter from "./routes/bid.route.js"
+import gigRouter from "./routes/gig.route.js"
 
-app.use("/api/v1/users",userRouter)
 
+app.use("/api/users",userRouter)
+app.use("/api/bids", bidRouter)
+app.use("/api/gigs", gigRouter)
 
+// 404 route
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found !!" });
   console.log("Route not found" , req.method , req.originalUrl);
