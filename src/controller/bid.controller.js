@@ -1,70 +1,143 @@
 import { Bid } from "../models/bid.model.js";
+import { Gig } from "../models/gig.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 
-const placeBid = asyncHandler( async ( req , res ) => {
+const placeBid = asyncHandler(async (req, res) => {
+  const { gigId, message, price } = req.body;
+  const bidder = req.user?._id;
+  const freelancerName = req.user?.name;
 
-    const gig = req.params.gigId;
-    if(!gig){
-        throw new ApiError(400, "Gig ID is required");
-    }
+  console.log("placeBid payload", {
+    gigId,
+    message,
+    price,
+    bidder,
+    freelancerName,
+  });
 
-    const message  = req.body;
-    if(!message){
-        throw new ApiError(400, "Bid message is required");
-    }
+  if (!gigId) {
+    throw new ApiError(400, "Gig ID is required");
+  }
 
-    const bidder = req.user.id;
-    if(!bidder){
-        throw new ApiError(401, "Unauthorized: Bidder information is missing");
-    }
+  if (!message || message.trim() === "") {
+    throw new ApiError(400, "Bid message is required");
+  }
 
-    const bid = new Bid( {
-        gig,
-        bidder,
-        message
-    } );
+  if (typeof price !== "number" || price <= 0) {
+    throw new ApiError(400, "Bid price must be a positive number");
+  }
 
-    await bid.save();
+  if (!bidder) {
+    throw new ApiError(401, "Unauthorized: Bidder information is missing");
+  }
 
-    if(!bid){
-        throw new ApiError(500, "Failed to create bid");
-    }   
+  const gig = await Gig.findById(gigId);
+  if (!gig) {
+    throw new ApiError(404, "Gig not found");
+  }
 
-    res.
-    status(201).
-    json(new ApiResponse(201, bid, "Bid created successfully"));
-})
+  if (gig.status !== "open") {
+    throw new ApiError(409, "Cannot place a bid on an assigned gig");
+  }
 
-const getAllBidsForGig = asyncHandler( async ( req , res ) => {
+  const bid = new Bid({
+    gig: gigId,
+    bidder,
+    freelancerName: freelancerName || "Unknown",
+    message: message.trim(),
+    price,
+  });
 
-    const gig = req.params.gigId;
-    if(!gig){
-        throw new ApiError(400, "Gig ID is required");
-    }
+  await bid.save();
 
-    const owner = req.user.id;
-    if(!owner){
-        throw new ApiError(401, "Unauthorized: Owner information is missing");
-    }
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      {
+        _id: bid._id,
+        gigId: bid.gig,
+        freelancerId: bid.bidder,
+        freelancerName: bid.freelancerName,
+        message: bid.message,
+        price: bid.price,
+        status: bid.status,
+        createdAt: bid.createdAt,
+        updatedAt: bid.updatedAt,
+      },
+      "Bid created successfully",
+    ),
+  );
+});
 
-    if(owner !== gig.owner){
-        throw new ApiError(403, "Forbidden: You are not the owner of this gig");
-    }
+const getAllBidsForGig = asyncHandler(async (req, res) => {
+  const gigId = req.params.gigId;
 
-    const bids = await Bid.find( { gig } ).populate('bidder', 'name email');
+  if (!gigId) {
+    throw new ApiError(400, "Gig ID is required");
+  }
 
-    if(!bids){
-        throw new ApiError(404, "No bids found for the specified gig");
-    }
+  console.log("getAllBidsForGig", { gigId, userId: req.user?._id });
 
-    res.
-    status(200).
-    json(new ApiResponse(200, bids, "Bids retrieved successfully"));
-})
+  const bids = await Bid.find({ gig: gigId }).populate("bidder", "name email");
 
-export{
-    placeBid,
-    getAllBidsForGig
-}
+  const formattedBids = bids.map((bid) => ({
+    _id: bid._id,
+    gigId: bid.gig,
+    freelancerId: bid.bidder?._id,
+    freelancerName: bid.freelancerName || bid.bidder?.name,
+    message: bid.message,
+    price: bid.price,
+    status: bid.status,
+    createdAt: bid.createdAt,
+    updatedAt: bid.updatedAt,
+  }));
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formattedBids, "Bids retrieved successfully"));
+});
+
+const getBidsByUser = asyncHandler(async (req, res) => {
+  const userId = req.user?._id;
+
+  const bids = await Bid.find({ bidder: userId })
+    .populate({
+      path: "gig",
+      populate: { path: "owner", select: "name email" },
+    })
+    .populate("bidder", "name email");
+
+  const formattedBids = bids.map((bid) => ({
+    _id: bid._id,
+    gigId: bid.gig?._id,
+    freelancerId: bid.bidder?._id || bid.bidder,
+    freelancerName: bid.freelancerName || bid.bidder?.name,
+    message: bid.message,
+    price: bid.price,
+    status: bid.status,
+    createdAt: bid.createdAt,
+    updatedAt: bid.updatedAt,
+    gig: bid.gig
+      ? {
+          _id: bid.gig._id,
+          title: bid.gig.title,
+          description: bid.gig.description,
+          budget: bid.gig.budget,
+          ownerId: bid.gig.owner?._id || bid.gig.owner,
+          ownerName: bid.gig.owner?.name || "",
+          status: bid.gig.status,
+          createdAt: bid.gig.createdAt,
+        }
+      : null,
+  }));
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, formattedBids, "User bids retrieved successfully"),
+    );
+});
+
+export { placeBid, getAllBidsForGig, getBidsByUser };

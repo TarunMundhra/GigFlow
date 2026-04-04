@@ -12,7 +12,16 @@ const bidSchema = new Schema( {
         required : true
     },
     message : {
-        type : String
+        type : String,
+        required : true
+    },
+    price : {
+        type : Number,
+        required : true
+    },
+    freelancerName : {
+        type : String,
+        required : true
     },
     status : {
         type : String,

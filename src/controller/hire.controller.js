@@ -6,58 +6,75 @@ import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 
 export const hireBid = asyncHandler(async (req, res) => {
-  const { gigId, bidId } = req.params;
-  const ownerId = req.user.id;
+  const { bidId } = req.params;
+  const ownerId = req.user?._id;
+
+  if (!bidId) {
+    throw new ApiError(400, "Bid ID is required");
+  }
+
+  if (!ownerId) {
+    throw new ApiError(401, "Unauthorized: User information is missing");
+  }
 
   const session = await mongoose.startSession();
 
   try {
     await session.withTransaction(async () => {
-      // Atomically assign gig (ONLY if still open)
-      const gig = await Gig.findOneAndUpdate(
-        {
-          _id: gigId,
-          owner: ownerId,
-          status: "open"
-        },
-        { $set: { status: "assigned" } },
-        { session, new: true }
-      );
-
-      if (!gig) {
-        throw new ApiError(409, "Gig already assigned");
+      const bid = await Bid.findById(bidId).session(session);
+      if (!bid) {
+        throw new ApiError(404, "Bid not found");
       }
 
-      // Mark selected bid as hired
+      const gig = await Gig.findById(bid.gig).session(session);
+      if (!gig) {
+        throw new ApiError(404, "Gig not found for this bid");
+      }
+
+      if (!gig.owner.equals(ownerId)) {
+        throw new ApiError(
+          403,
+          "Forbidden: Only the gig owner can hire a freelancer",
+        );
+      }
+
+      if (gig.status !== "open") {
+        throw new ApiError(409, "Gig has already been assigned");
+      }
+
       const hiredBid = await Bid.findOneAndUpdate(
         {
           _id: bidId,
-          gig: gigId,
-          status: "pending"
+          gig: gig._id,
+          status: "pending",
         },
         { $set: { status: "hired" } },
-        { session, new: true }
+        { session, new: true },
       );
 
       if (!hiredBid) {
         throw new ApiError(404, "Bid not found or already processed");
       }
 
-      // Reject all other bids for the gig
+      await Gig.findByIdAndUpdate(
+        gig._id,
+        { $set: { status: "assigned" } },
+        { session },
+      );
+
       await Bid.updateMany(
         {
-          gig: gigId,
-          _id: { $ne: bidId }
+          gig: gig._id,
+          _id: { $ne: bidId },
         },
         { $set: { status: "rejected" } },
-        { session }
+        { session },
       );
     });
 
     return res
       .status(200)
       .json(new ApiResponse(200, null, "Freelancer hired successfully"));
-
   } finally {
     session.endSession();
   }
