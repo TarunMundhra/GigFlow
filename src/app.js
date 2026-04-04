@@ -1,6 +1,7 @@
 import express from "express"
 import cors from "cors"
 import cookieParser from "cookie-parser"
+import { ApiError } from "./utils/apiError.js"
 
 const app = express();
 
@@ -28,8 +29,27 @@ app.use("/api/gigs", gigRouter)
 
 // 404 route
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found !!" });
-  console.log("Route not found" , req.method , req.originalUrl);
+  res.status(404).json({ success: false, message: "Route not found" });
+  console.log("Route not found", req.method, req.originalUrl);
 });
 
-export {app}
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err?.stack || err);
+
+  if (err instanceof ApiError) {
+    return res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+      errors: err.errors,
+      data: err.data,
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
+});
+
+export { app }
