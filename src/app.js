@@ -6,7 +6,7 @@ import { ApiError } from "./utils/apiError.js"
 const app = express();
 
 app.use(cors({
-    origin : "https://gig-flow-frontend-suxs.vercel.app",
+    origin : "https://gig-flow-frontend-eight.vercel.app",
     credentials : true
 }))
 
