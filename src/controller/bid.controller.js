@@ -80,6 +80,20 @@ const getAllBidsForGig = asyncHandler(async (req, res) => {
 
   console.log("getAllBidsForGig", { gigId, userId: req.user?._id });
 
+  const gig = await Gig.findById(gigId).populate("admins", "_id");
+  if (!gig) {
+    throw new ApiError(404, "Gig not found");
+  }
+
+  const isAdmin =
+    gig.admins?.some((admin) =>
+      admin._id ? admin._id.equals(req.user?._id) : admin.equals(req.user?._id),
+    ) || gig.owner.equals(req.user?._id);
+
+  if (!isAdmin) {
+    throw new ApiError(403, "Forbidden: Only gig admins can view bids");
+  }
+
   const bids = await Bid.find({ gig: gigId }).populate("bidder", "name email");
 
   const formattedBids = bids.map((bid) => ({

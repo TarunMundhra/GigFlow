@@ -31,10 +31,17 @@ export const hireBid = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Gig not found for this bid");
       }
 
-      if (!gig.owner.equals(ownerId)) {
+      const isAdmin =
+        gig.admins?.some((adminId) =>
+          adminId.equals
+            ? adminId.equals(ownerId)
+            : adminId.toString() === ownerId.toString(),
+        ) || gig.owner.equals(ownerId);
+
+      if (!isAdmin) {
         throw new ApiError(
           403,
-          "Forbidden: Only the gig owner can hire a freelancer",
+          "Forbidden: Only a gig admin can hire a freelancer",
         );
       }
 

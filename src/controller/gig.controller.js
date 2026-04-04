@@ -10,6 +10,11 @@ const formatGig = (gig) => ({
   budget: gig.budget,
   ownerId: gig.owner?._id || gig.owner,
   ownerName: gig.owner?.name || gig.owner?.username || "",
+  admins: gig.admins
+    ? gig.admins.map((admin) =>
+        admin?._id ? admin._id.toString() : admin.toString(),
+      )
+    : [],
   status: gig.status,
   createdAt: gig.createdAt,
   updatedAt: gig.updatedAt,
@@ -28,6 +33,7 @@ const createGig = asyncHandler(async (req, res) => {
     description,
     budget,
     owner,
+    admins: [owner],
   });
 
   await newGig.save();
