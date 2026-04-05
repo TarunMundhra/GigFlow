@@ -5,10 +5,17 @@ import { ApiError } from "./utils/apiError.js"
 
 const app = express();
 
-app.use(cors({
-    origin : "https://gig-flow-frontend-eight.vercel.app",
-    credentials : true
-}))
+const corsOptions = {
+  origin: [
+    'https://gig-flow-frontend-eight.vercel.app', // Your production frontend
+    'http://localhost:3000' // For your local development
+  ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Allowed methods
+  credentials: true // Important if you are passing cookies/tokens
+};
+
+// Apply CORS to your app
+app.use(cors(corsOptions));
 
 app.use(express.json({
     limit : "16kb"
