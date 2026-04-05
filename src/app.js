@@ -13,6 +13,7 @@ app.use(cors({
 app.use(express.json({
     limit : "16kb"
 }))
+
 app.use(express.urlencoded({extended:true,limit : "16kb"}))
 app.use(express.static("public"))
 app.use(cookieParser())
@@ -26,6 +27,10 @@ import gigRouter from "./routes/gig.route.js"
 app.use("/api/users",userRouter)
 app.use("/api/bids", bidRouter)
 app.use("/api/gigs", gigRouter)
+
+app.use("/", (req, res) => {
+  res.status(200).json({ success: true, message: "Welcome to the GigFlow API" });
+});
 
 // 404 route
 app.use((req, res) => {
